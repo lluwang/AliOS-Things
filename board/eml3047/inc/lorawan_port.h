@@ -26,7 +26,7 @@ typedef uint32_t time_tick_t;
 extern hal_lrwan_dev_chg_mode_t aos_lrwan_chg_mode;
 extern hal_lrwan_time_itf_t aos_lrwan_time_itf;
 extern hal_lrwan_radio_ctrl_t aos_lrwan_radio_ctrl;
-
+extern hal_manufactory_itf_t aos_mft_itf;
 
 #ifdef __cplusplus
 }

@@ -1198,4 +1198,33 @@ static uint16_t HW_AdcReadChannel( uint32_t Channel )
     return adcData;
 }
 
+uint32_t HW_Get_MFT_ID(void)
+{
+    return 0x1234;
+}
+
+uint32_t HW_Get_MFT_Model(void)
+{
+    return 0x4321;
+}
+
+uint32_t HW_Get_MFT_Rev(void)
+{
+    return 0x0001;
+}
+
+uint32_t HW_Get_MFT_SN(void)
+{
+    return 0xffff;
+}
+
+bool HW_Set_MFT_Baud(uint32_t baud)
+{
+    return true;
+}
+
+uint32_t HW_Get_MFT_Baud(void)
+{
+    return 115200;
+}
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

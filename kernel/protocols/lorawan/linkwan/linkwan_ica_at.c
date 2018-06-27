@@ -6,6 +6,7 @@
 #include "Region.h"
 #include "linkwan.h"
 #include "linkwan_ica_at.h"
+#include "lorawan_port.h"
 
 #define ATCMD_SIZE (LORAWAN_APP_DATA_BUFF_SIZE + 14)
 #define PORT_LEN 4
@@ -168,11 +169,87 @@ void process_linkwan_at(void)
             ret = false;
         }
     } else if (strncmp(rxcmd, LORA_AT_CDEVADDR, strlen(LORA_AT_CDEVADDR)) == 0) {
-        ret = false;
+        uint8_t at_str_len;
+        at_str_len = strlen(LORA_AT_CDEVADDR);
+        if (rxcmd_index == (at_str_len + 2) &&
+            strcmp(&rxcmd[at_str_len], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s=<DevAddr:length is 8, Device address of ABP mode>\r\n", LORA_AT_CDEVADDR);
+        } else if (rxcmd_index == (at_str_len + 1) &&
+            rxcmd[at_str_len] == '?') {
+            uint8_t *devaddr = get_lora_devaddr();
+            uint8_t i;
+            length = snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%02x%02x%02x%02x", LORA_AT_CDEVADDR,
+                devaddr[0], devaddr[1], devaddr[2], devaddr[3]);
+            snprintf(atcmd + length, ATCMD_SIZE, "\r\nOK\r\n");
+        } else if (rxcmd_index == (at_str_len + 9) &&
+            rxcmd[at_str_len] == '=') {
+            ret = false;
+            length = hex2bin(&rxcmd[at_str_len + 1], buf, 4);
+            if (length == 4) {
+                ret = set_lora_devaddr(buf);
+                if (ret == true) {
+                    snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+                }
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CAPPSKEY, strlen(LORA_AT_CAPPSKEY)) == 0) {
-        ret = false;
+        uint8_t at_str_len;
+        at_str_len = strlen(LORA_AT_CAPPSKEY);
+        if (rxcmd_index == (at_str_len + 2) &&
+            strcmp(&rxcmd[at_str_len], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s=<AppSKey: length is 32>\r\n", LORA_AT_CAPPSKEY);
+        } else if (rxcmd_index == (at_str_len + 1) &&
+            rxcmd[at_str_len] == '?') {
+            uint8_t *devaddr = get_lora_appskey();
+            uint8_t i;
+            length = snprintf(atcmd, ATCMD_SIZE, "\r\n%s:", LORA_AT_CAPPSKEY);
+            for (i = 0; i < 16; i++) {
+                length += snprintf(atcmd + length, ATCMD_SIZE, "%02x", devaddr[i]);
+            }
+            snprintf(atcmd + length, ATCMD_SIZE, "\r\nOK\r\n");
+        } else if (rxcmd_index == (at_str_len + 33) &&
+            rxcmd[at_str_len] == '=') {
+            ret = false;
+            length = hex2bin(&rxcmd[at_str_len + 1], buf, 16);
+            if (length == 16) {
+                ret = set_lora_appskey(buf);
+                if (ret == true) {
+                    snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+                }
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CNWKSKEY, strlen(LORA_AT_CNWKSKEY)) == 0) {
-        ret = false;
+        uint8_t at_str_len;
+        at_str_len = strlen(LORA_AT_CNWKSKEY);
+        if (rxcmd_index == (at_str_len + 2) &&
+            strcmp(&rxcmd[at_str_len], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s=<NwkSKey:length is 32>\r\n", LORA_AT_CNWKSKEY);
+        } else if (rxcmd_index == (at_str_len + 1) &&
+            rxcmd[at_str_len] == '?') {
+            uint8_t *devaddr = get_lora_nwkskey();
+            uint8_t i;
+            length = snprintf(atcmd, ATCMD_SIZE, "\r\n%s:", LORA_AT_CNWKSKEY);
+            for (i = 0; i < 16; i++) {
+                length += snprintf(atcmd + length, ATCMD_SIZE, "%02x", devaddr[i]);
+            }
+            snprintf(atcmd + length, ATCMD_SIZE, "\r\nOK\r\n");
+        } else if (rxcmd_index == (at_str_len + 33) &&
+            rxcmd[at_str_len] == '=') {
+            ret = false;
+            length = hex2bin(&rxcmd[at_str_len + 1], buf, 16);
+            if (length == 16) {
+                ret = set_lora_nwkskey(buf);
+                if (ret == true) {
+                    snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+                }
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CADDMUTICAST, strlen(LORA_AT_CADDMUTICAST)) == 0) {
         ret = false;
     } else if (strncmp(rxcmd, LORA_AT_CDELMUTICAST, strlen(LORA_AT_CDELMUTICAST)) == 0) {
@@ -275,8 +352,9 @@ void process_linkwan_at(void)
             snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"status\"\r\nOK\r\n", LORA_AT_CSTATUS);
         } else if (rxcmd_index == (strlen(LORA_AT_CSTATUS) + 1) &&
                    rxcmd[strlen(LORA_AT_CSTATUS)] == '?') {
-            status = get_device_status();
-            snprintf(atcmd, ATCMD_SIZE, "%s:%d\r\nOK\r\n", LORA_AT_CSTATUS, status);
+            ret = true;
+            status = get_lora_device_status();
+            snprintf(atcmd, ATCMD_SIZE, "%s:%02d\r\nOK\r\n", LORA_AT_CSTATUS, status);
         } else {
             ret = false;
         }
@@ -325,15 +403,23 @@ void process_linkwan_at(void)
         }
     } else if (strncmp(rxcmd, LORA_AT_CAPPPORT, strlen(LORA_AT_CAPPPORT)) == 0) {
         lora_AppData_t *tx_data;
-        if (rxcmd_index == (strlen(LORA_AT_CAPPPORT) + 2) &&
-            strcmp(&rxcmd[strlen(LORA_AT_CAPPPORT)], "=?") == 0) {
-            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"value\"\r\n", LORA_AT_CAPPPORT);
-        } else if (rxcmd_index == (strlen(LORA_AT_CAPPPORT) + 1) &&
-                   rxcmd[strlen(LORA_AT_CAPPPORT)] == '?') {
+        uint8_t port;
+        uint8_t at_cmd_len;
+        at_cmd_len = strlen(LORA_AT_CAPPPORT);
+        if (rxcmd_index == (at_cmd_len + 2) &&
+            strcmp(&rxcmd[at_cmd_len], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"value\"\r\nOK\r\n", LORA_AT_CAPPPORT);
+        } else if (rxcmd_index == (at_cmd_len + 1) &&
+                   rxcmd[at_cmd_len] == '?') {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d\r\nOK\r\n", LORA_AT_CAPPPORT, get_lora_app_port());
+        } else if (rxcmd_index > (at_cmd_len + 1) &&
+                   rxcmd[at_cmd_len] == '=') {
             ret = false;
-        } else if (rxcmd_index > (strlen(LORA_AT_CAPPPORT) + 1) &&
-                   rxcmd[strlen(LORA_AT_CAPPPORT)] == '=') {
-            ret = false;
+            port = (uint8_t)strtol(&rxcmd[at_cmd_len + 1], NULL, 0);
+            ret = set_lora_app_port(port);
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+            }
         } else {
             ret = false;
         }
@@ -400,15 +486,39 @@ void process_linkwan_at(void)
     } else if (strncmp(rxcmd, LORA_AT_CSAVE, strlen(LORA_AT_CREPEATERFILTER)) == 0) {
         ret = false;
     } else if (strncmp(rxcmd, LORA_AT_CGMI, strlen(LORA_AT_CGMI)) == 0) {
-        ret = false;
+        ret = true;
+        snprintf(atcmd, ATCMD_SIZE, "\r\n%s=0x%04x\r\nOK\r\n", LORA_AT_CGMI, aos_mft_itf.get_mft_id());
     } else if (strncmp(rxcmd, LORA_AT_CGMM, strlen(LORA_AT_CGMM)) == 0) {
-        ret = false;
+        ret = true;
+        snprintf(atcmd, ATCMD_SIZE, "\r\n%s=0x%04x\r\nOK\r\n", LORA_AT_CGMM, aos_mft_itf.get_mft_model());
     } else if (strncmp(rxcmd, LORA_AT_CGMR, strlen(LORA_AT_CGMR)) == 0) {
-        ret = false;
+        ret = true;
+        snprintf(atcmd, ATCMD_SIZE, "\r\n%s=0x%04x\r\nOK\r\n", LORA_AT_CGMR, aos_mft_itf.get_mft_rev());
     } else if (strncmp(rxcmd, LORA_AT_CGSN, strlen(LORA_AT_CGSN)) == 0) {
-        ret = false;
+        ret = true;
+        snprintf(atcmd, ATCMD_SIZE, "\r\n%s=0x%04x\r\nOK\r\n", LORA_AT_CGSN, aos_mft_itf.get_mft_sn());
     } else if (strncmp(rxcmd, LORA_AT_CGBR, strlen(LORA_AT_CGBR)) == 0) {
-        ret = false;
+        uint32_t baud;
+        uint8_t at_cmd_len;
+        at_cmd_len = strlen(LORA_AT_CGBR);
+        if (rxcmd_index == (at_cmd_len + 2) &&
+            strcmp(&rxcmd[at_cmd_len], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"value\"\r\n", LORA_AT_CGBR);
+        } else if (rxcmd_index == (at_cmd_len + 1) &&
+                       rxcmd[at_cmd_len] == '?') {
+            baud = aos_mft_itf.get_mft_baud();
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d\r\n", LORA_AT_CGBR, baud);
+        } else if (rxcmd_index > (at_cmd_len + 1) &&
+                       rxcmd[at_cmd_len] == '=') {
+            ret = false;
+            baud = strtol(&rxcmd[at_cmd_len + 1], NULL, 0);
+            ret = aos_mft_itf.set_mft_baud(baud);
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_ILOGLVL, strlen(LORA_AT_ILOGLVL)) == 0) {
         ret = false;
     } else if (strncmp(rxcmd, LORA_AT_IREBOOT, strlen(LORA_AT_IREBOOT)) == 0) {

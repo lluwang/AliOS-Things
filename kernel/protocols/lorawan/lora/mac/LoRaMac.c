@@ -674,6 +674,9 @@ static void OnRadioTxDone( void )
         McpsConfirm.Status = LORAMAC_EVENT_INFO_STATUS_OK;
         ChannelsNbRepCounter++;
     }
+#ifdef CONFIG_LINKWAN
+    set_lora_device_status(DEVICE_STATUS_SEND_PASS);
+#endif
 }
 
 static void PrepareRxDoneAbort( void )
@@ -1069,6 +1072,9 @@ static void OnRadioTxTimeout( void )
     McpsConfirm.Status = LORAMAC_EVENT_INFO_STATUS_TX_TIMEOUT;
     MlmeConfirm.Status = LORAMAC_EVENT_INFO_STATUS_TX_TIMEOUT;
     LoRaMacFlags.Bits.MacDone = 1;
+#ifdef CONFIG_LINKWAN
+    set_lora_device_status(DEVICE_STATUS_SEND_FAIL);
+#endif
 }
 
 static void OnRadioRxError( void )
@@ -1211,7 +1217,14 @@ static void OnMacStateCheckTimerEvent( void )
 
                 LoRaMacState &= ~LORAMAC_TX_RUNNING;
             }
+#ifdef CONFIG_LINKWAN
+        } else {
+            if ( !(( LoRaMacFlags.Bits.MlmeReq == 1 ) && ( MlmeConfirm.MlmeRequest == MLME_JOIN )) )
+                set_lora_device_status(DEVICE_STATUS_SEND_PASS_WITHOUT_DL);
         }
+#else
+        }
+#endif
 
         if ( ( AckTimeoutRetry == true ) && ( ( LoRaMacState & LORAMAC_TX_DELAYED ) == 0 ) ) {
             // Retransmissions procedure for confirmed uplinks
@@ -1728,7 +1741,9 @@ LoRaMacStatus_t Send( LoRaMacHeader_t *macHdr, uint8_t fPort, void *fBuffer, uin
 {
     LoRaMacFrameCtrl_t fCtrl;
     LoRaMacStatus_t status = LORAMAC_STATUS_PARAMETER_INVALID;
-
+#ifdef CONFIG_LINKWAN
+    set_lora_device_status(DEVICE_STATUS_IDLE);
+#endif
     fCtrl.Value = 0;
     fCtrl.Bits.FOptsLen      = 0;
     fCtrl.Bits.FPending      = 0;
@@ -2085,7 +2100,9 @@ LoRaMacStatus_t SendFrameOnChannel( uint8_t channel )
     Radio.Send( LoRaMacBuffer, LoRaMacBufferPktLen );
 
     LoRaMacState |= LORAMAC_TX_RUNNING;
-
+#ifdef CONFIG_LINKWAN
+    set_lora_device_status(DEVICE_STATUS_SENDING);
+#endif
     return LORAMAC_STATUS_OK;
 }
 

@@ -182,7 +182,7 @@ static void radio_reset()
 
     // Set RESET pin to 0
     HW_GPIO_Init( RADIO_RESET_PORT, RADIO_RESET_PIN, &initStruct);
-    HW_GPIO_Write( RADIO_RESET_PORT, RADIO_RESET_PIN, 0 );	
+    HW_GPIO_Write( RADIO_RESET_PORT, RADIO_RESET_PIN, 0 );
 }
 
 /**
@@ -201,7 +201,7 @@ static void radio_reset_cfg_input()
 
     // Configure RESET as input
     initStruct.Mode = GPIO_NOPULL;
-    HW_GPIO_Init( RADIO_RESET_PORT, RADIO_RESET_PIN, &initStruct);	
+    HW_GPIO_Init( RADIO_RESET_PORT, RADIO_RESET_PIN, &initStruct);
 }
 
 /**
@@ -212,7 +212,7 @@ static void radio_reset_cfg_input()
  */
 static void radio_rw_en()
 {
-	//NSS = 0;
+    //NSS = 0;
     HW_GPIO_Write( RADIO_NSS_PORT, RADIO_NSS_PIN, 0 );
 }
 
@@ -224,7 +224,7 @@ static void radio_rw_en()
  */
 static void radio_rw_dis()
 {
-	//NSS = 1;
+    //NSS = 1;
     HW_GPIO_Write( RADIO_NSS_PORT, RADIO_NSS_PIN, 1 );
 }
 
@@ -236,7 +236,73 @@ static void radio_rw_dis()
  */
 static uint16_t radio_rw(uint16_t tx_data)
 {
-	HW_SPI_InOut(tx_data);
+    HW_SPI_InOut(tx_data);
+}
+
+/**
+ * @fn     get_mft_id
+ * @brief  get manufactory id
+ * @param  None
+ * @rtn    id
+ */
+static uint32_t get_mft_id(void)
+{
+    return HW_Get_MFT_ID();
+}
+
+/**
+ * @fn     get_mft_model
+ * @brief  get manufactory model
+ * @param  None
+ * @rtn    model
+ */
+static uint32_t get_mft_model(void)
+{
+    return HW_Get_MFT_Model();
+}
+
+/**
+ * @fn     get_mft_rev
+ * @brief  get manufactory revision
+ * @param  None
+ * @rtn    rev
+ */
+static uint32_t get_mft_rev(void)
+{
+    return HW_Get_MFT_Rev();
+}
+
+/**
+ * @fn     get_mft_sn
+ * @brief  get manufactory sn
+ * @param  None
+ * @rtn    sn
+ */
+static uint32_t get_mft_sn(void)
+{
+    return HW_Get_MFT_SN();
+}
+
+/**
+ * @fn     set_mft_baud
+ * @brief  set manufactory console's baudrate
+ * @param  baudrate of the console
+ * @rtn    true indicate success, false indicate baudrate not supported
+ */
+static bool set_mft_baud(uint32_t baud)
+{
+    return HW_Set_MFT_Baud(baud);
+}
+
+/**
+ * @fn     get_mft_baud
+ * @brief  get manufactory console's baudrate
+ * @param  None
+ * @rtn    console baudrate
+ */
+static uint32_t get_mft_baud(void)
+{
+    return HW_Get_MFT_Baud();
 }
 
 /* the struct is for changing the device working mode */
@@ -272,3 +338,12 @@ hal_lrwan_radio_ctrl_t aos_lrwan_radio_ctrl = {
     .radio_rw = radio_rw,
 };
 
+/* LoraWan manufactory interface*/
+hal_manufactory_itf_t aos_mft_itf = {
+    .get_mft_id = get_mft_id,
+    .get_mft_model = get_mft_model,
+    .get_mft_rev = get_mft_rev,
+    .get_mft_sn = get_mft_sn,
+    .set_mft_baud = set_mft_baud,
+    .get_mft_baud = get_mft_baud,
+};

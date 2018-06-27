@@ -205,6 +205,12 @@ void HW_GpioInit(void);
 void SYS_LED_OFF(void);
 void SYS_LED_ON(void);
 
+uint32_t HW_Get_MFT_ID(void);
+uint32_t HW_Get_MFT_Model(void);
+uint32_t HW_Get_MFT_Rev(void);
+uint32_t HW_Get_MFT_SN(void);
+bool HW_Set_MFT_Baud(uint32_t baud);
+uint32_t HW_Get_MFT_Baud(void);
 #ifdef __cplusplus
 }
 #endif

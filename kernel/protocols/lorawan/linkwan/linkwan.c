@@ -47,9 +47,11 @@ static LoRaParam_t lora_param = {
 
 static TimerEvent_t TxNextPacketTimer;
 volatile static DeviceState_t device_state = DEVICE_STATE_INIT;
+static DeviceStatus_t device_status = DEVICE_STATUS_IDLE;
 
 lora_config_t g_lora_config = {1, DR_5, INVALID_LORA_CONFIG};
 lora_dev_t g_lora_dev = {LORAWAN_DEVICE_EUI, LORAWAN_APPLICATION_EUI, LORAWAN_APPLICATION_KEY, CLASS_A, NODE_MODE_NORMAL, 0xffff, VALID_LORA_CONFIG};
+lora_abp_id_t g_lora_abp_id = {LORAWAN_DEVICE_ADDRESS, LORAWAN_NWKSKEY, LORAWAN_APPSKEY, INVALID_LORA_CONFIG};
 node_freq_mode_t g_freq_mode = FREQ_MODE_INTRA;
 join_method_t g_join_method;
 
@@ -244,7 +246,7 @@ static void McpsIndication(McpsIndication_t *mcpsIndication)
     // Check RxSlot
     DBG_LINKWAN( "rssi = %d, snr = %d, datarate = %d\r\n", mcpsIndication->Rssi, mcpsIndication->Snr,
                  mcpsIndication->RxDatarate);
-
+    set_lora_device_status(DEVICE_STATUS_SEND_PASS_WITH_DL);
     if (mcpsIndication->RxData == true) {
         switch ( mcpsIndication->Port ) {
             case 224:
@@ -292,7 +294,9 @@ static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
             if (mlmeConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK) {
                 // Status is OK, node has joined the network
                 device_state = DEVICE_STATE_JOINED;
+                set_lora_device_status(DEVICE_STATUS_JOIN_PASS);
             } else {
+                set_lora_device_status(DEVICE_STATUS_JOIN_FAIL);
                 // Join was not successful. Try to join again
                 reset_join_state();
                 if (g_join_method != SCAN_JOIN_METHOD) {
@@ -321,6 +325,8 @@ static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
             if ( mlmeConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK ) {
                 // Check DemodMargin
                 // Check NbGateways
+            } else {
+                set_lora_device_status(DEVICE_STATUS_NETWORK_ABNORMAL);
             }
             break;
         }
@@ -373,18 +379,17 @@ static void print_dev_addr(void)
                 g_lora_dev.app_key[12], g_lora_dev.app_key[13], g_lora_dev.app_key[14], g_lora_dev.app_key[15]);
 #else
     DBG_LINKWAN("ABP\r\n");
-    DBG_LINKWAN("DevAdd=  %08X\n\r", DevAddr);
-    DBG_LINKWAN("DevEui= %02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\r\n",
-                g_lora_dev.dev_eui[0], g_lora_dev.dev_eui[1], g_lora_dev.dev_eui[2], g_lora_dev.dev_eui[3], \
-                g_lora_dev.dev_eui[4], g_lora_dev.dev_eui[5], g_lora_dev.dev_eui[6], g_lora_dev.dev_eui[7]);
-    DBG_LINKWAN("NwkSKey= %02X", NwkSKey[0]);
+    DBG_LINKWAN("DevAddr= %02X-%02X-%02X-%02X\r\n",
+                g_lora_abp_id.devaddr[0], g_lora_abp_id.devaddr[1], g_lora_abp_id.devaddr[2],
+                g_lora_abp_id.devaddr[3]);
+    DBG_LINKWAN("NwkSKey= %02X", g_lora_abp_id.nwkskey[0]);
     for (int i = 1; i < 16; i++) {
-        DBG_LINKWAN(" %02X", NwkSKey[i]);
+        PRINTF_RAW(" %02X", g_lora_abp_id.nwkskey[i]);
     };
     DBG_LINKWAN("\r\n");
-    DBG_LINKWAN("AppSKey= %02X", AppSKey[0]);
+    DBG_LINKWAN("AppSKey= %02X", g_lora_abp_id.appskey[0]);
     for (int i = 1; i < 16; i++) {
-        DBG_LINKWAN(" %02X", AppSKey[i]);
+        PRINTF_RAW(" %02X", g_lora_abp_id.appskey[i]);
     };
     DBG_LINKWAN("\r\n");
 #endif
@@ -401,6 +406,7 @@ void lora_fsm( void )
     int ret;
     lora_config_t lora_config;
     lora_dev_t lora_dev;
+    lora_abp_id_t lora_abp_id;
 #endif
 
     while (1) {
@@ -423,6 +429,12 @@ void lora_fsm( void )
                 aos_kv_get("lora_dev", &lora_dev, &len);
                 if (lora_dev.flag == VALID_LORA_CONFIG) {
                     memcpy(&g_lora_dev, &lora_dev, sizeof(g_lora_dev));
+                }
+                memset(&lora_abp_id, 0, sizeof(lora_abp_id));
+                len = sizeof(g_lora_abp_id);
+                aos_kv_get("lora_abp", &lora_abp_id, &len);
+                if (lora_abp_id.flag == VALID_LORA_CONFIG) {
+                    memcpy(&g_lora_abp_id, &lora_abp_id, sizeof(g_lora_abp_id));
                 }
 #endif
                 if (g_lora_dev.dev_eui[5] & 0x1) {
@@ -506,6 +518,7 @@ void lora_fsm( void )
 
 #endif
                 device_state = DEVICE_STATE_JOIN;
+                set_lora_device_status(DEVICE_STATUS_IDLE);
                 break;
             }
 
@@ -541,15 +554,15 @@ void lora_fsm( void )
                 LoRaMacMibSetRequestConfirm(&mibReq);
 
                 mibReq.Type = MIB_DEV_ADDR;
-                mibReq.Param.DevAddr = DevAddr;
+                mibReq.Param.DevAddr = g_lora_abp_id.devaddr;
                 LoRaMacMibSetRequestConfirm(&mibReq);
 
                 mibReq.Type = MIB_NWK_SKEY;
-                mibReq.Param.NwkSKey = NwkSKey;
+                mibReq.Param.NwkSKey = g_lora_abp_id.nwkskey;
                 LoRaMacMibSetRequestConfirm(&mibReq);
 
                 mibReq.Type = MIB_APP_SKEY;
-                mibReq.Param.AppSKey = AppSKey;
+                mibReq.Param.AppSKey = g_lora_abp_id.appskey;
                 LoRaMacMibSetRequestConfirm(&mibReq);
 
                 mibReq.Type = MIB_NETWORK_JOINED;
@@ -908,4 +921,74 @@ bool send_lora_link_check(void)
 int get_device_status(void)
 {
     return device_state;
+}
+
+bool set_lora_devaddr(uint8_t *devaddr)
+{
+    memcpy(g_lora_abp_id.devaddr, devaddr, 4);
+    g_lora_abp_id.flag = VALID_LORA_CONFIG;
+#ifdef AOS_KV
+    aos_kv_set("lora_abp", &g_lora_abp_id, sizeof(g_lora_abp_id));
+#endif
+    return true;
+}
+
+uint8_t *get_lora_devaddr(void)
+{
+    return g_lora_abp_id.devaddr;
+}
+
+bool set_lora_appskey(uint8_t *buf)
+{
+    memcpy(g_lora_abp_id.appskey, buf, 16);
+    g_lora_abp_id.flag = VALID_LORA_CONFIG;
+#ifdef AOS_KV
+    aos_kv_set("lora_abp", &g_lora_abp_id, sizeof(g_lora_abp_id));
+#endif
+    return true;
+
+}
+uint8_t *get_lora_appskey(void)
+{
+    return g_lora_abp_id.appskey;
+}
+
+bool set_lora_nwkskey(uint8_t *buf)
+{
+    memcpy(g_lora_abp_id.nwkskey, buf, 16);
+    g_lora_abp_id.flag = VALID_LORA_CONFIG;
+#ifdef AOS_KV
+    aos_kv_set("lora_abp", &g_lora_abp_id, sizeof(g_lora_abp_id));
+#endif
+    return true;
+
+}
+uint8_t *get_lora_nwkskey(void)
+{
+    return g_lora_abp_id.nwkskey;
+}
+
+bool set_lora_app_port(uint8_t port)
+{
+    if (port < 1 || port > 223)
+        return false;
+    tx_data.Port = port;
+    return true;
+}
+
+uint8_t get_lora_app_port(void)
+{
+    return tx_data.Port;
+}
+
+bool set_lora_device_status(DeviceStatus_t ds)
+{
+    device_status = ds;
+    PRINTF_RAW("Set Device Status:%d\r\n", ds);
+    return true;
+}
+
+DeviceStatus_t get_lora_device_status(void)
+{
+    return device_status;
 }

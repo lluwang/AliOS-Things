@@ -45,6 +45,13 @@ typedef struct lora_dev_s {
     uint16_t flag;
 } lora_dev_t;
 
+typedef struct lora_abp_id_s {
+    uint8_t devaddr[4];
+    uint8_t appskey[16];
+    uint8_t nwkskey[16];
+    uint16_t flag;
+} lora_abp_id_t;
+
 typedef enum join_method_s {
     STORED_JOIN_METHOD = 0,
     DEF_JOIN_METHOD = 1,
@@ -99,6 +106,17 @@ typedef enum eDevicState {
     DEVICE_STATE_SLEEP
 } DeviceState_t;
 
+typedef enum eDeviceStatus {
+    DEVICE_STATUS_IDLE,//0
+    DEVICE_STATUS_SENDING,
+    DEVICE_STATUS_SEND_FAIL,
+    DEVICE_STATUS_SEND_PASS,
+    DEVICE_STATUS_JOIN_PASS,
+    DEVICE_STATUS_JOIN_FAIL,
+    DEVICE_STATUS_NETWORK_ABNORMAL,
+    DEVICE_STATUS_SEND_PASS_WITHOUT_DL,
+    DEVICE_STATUS_SEND_PASS_WITH_DL,
+} DeviceStatus_t;
 bool set_lora_freqband_mask(uint16_t mask);
 uint16_t get_lora_freqband_mask(void);
 
@@ -141,4 +159,18 @@ uint8_t get_lora_tx_len(void);
 
 bool send_lora_link_check(void);
 
+uint8_t *get_lora_devaddr(void);
+bool set_lora_devaddr(uint8_t *devaddr);
+
+uint8_t *get_lora_appskey(void);
+bool set_lora_appskey(uint8_t *buf);
+
+uint8_t *get_lora_nwkskey(void);
+bool set_lora_nwkskey(uint8_t *buf);
+
+uint8_t get_lora_app_port(void);
+bool set_lora_app_port(uint8_t port);
+
+DeviceStatus_t get_lora_device_status(void);
+bool set_lora_device_status(DeviceStatus_t ds);
 #endif /* LINKWAN_H */
