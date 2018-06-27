@@ -11,8 +11,12 @@
 #define ATCMD_SIZE (LORAWAN_APP_DATA_BUFF_SIZE + 14)
 #define PORT_LEN 4
 
-uint8_t atcmd[ATCMD_SIZE];
+//uint8_t atcmd[ATCMD_SIZE];
+uint8_t atcmd[100];
 uint16_t atcmd_index = 0;
+
+LoRaMacParams_t gMacParams;
+extern LoRaMacParams_t LoRaMacParamsDefaults;
 
 static int hex2bin(const char *hex, uint8_t *bin, uint16_t bin_length)
 {
@@ -55,7 +59,7 @@ void linkwan_serial_input(uint8_t cmd)
 {
     if ((cmd >= '0' && cmd <= '9') || (cmd >= 'a' && cmd <= 'z') ||
         (cmd >= 'A' && cmd <= 'Z') || cmd == '?' || cmd == '+' ||
-        cmd == ':' || cmd == '=') {
+        cmd == ':' || cmd == '=' || cmd == ' ' || cmd == ',') {
         atcmd[atcmd_index++] = cmd;
     } else if (cmd == '\r' || cmd == '\n') {
         atcmd[atcmd_index] = '\0';
@@ -251,11 +255,77 @@ void process_linkwan_at(void)
             ret = false;
         }
     } else if (strncmp(rxcmd, LORA_AT_CADDMUTICAST, strlen(LORA_AT_CADDMUTICAST)) == 0) {
-        ret = false;
+        if (rxcmd_index == (strlen(LORA_AT_CADDMUTICAST) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CADDMUTICAST)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"DevAddr\",\"AppSKey\",\"NwkSKey\"\r\nOK\r\n", LORA_AT_CADDMUTICAST);
+        } else if (rxcmd_index == (strlen(LORA_AT_CADDMUTICAST) + 1) &&
+                   rxcmd[strlen(LORA_AT_CADDMUTICAST)] == '?') {
+            MulticastParams_t *curMutiInfo = get_lora_cur_multicast();
+            if (curMutiInfo != NULL) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d,%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x,\
+				%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\r\n", LORA_AT_CADDMUTICAST,
+                        curMutiInfo->Address, \
+                        curMutiInfo->AppSKey[0], curMutiInfo->AppSKey[1], curMutiInfo->AppSKey[2], curMutiInfo->AppSKey[3],
+                        \
+                        curMutiInfo->AppSKey[4], curMutiInfo->AppSKey[5], curMutiInfo->AppSKey[6], curMutiInfo->AppSKey[7],
+                        \
+                        curMutiInfo->AppSKey[8], curMutiInfo->AppSKey[9], curMutiInfo->AppSKey[10],
+                        curMutiInfo->AppSKey[11], \
+                        curMutiInfo->AppSKey[12], curMutiInfo->AppSKey[13], curMutiInfo->AppSKey[14],
+                        curMutiInfo->AppSKey[15], \
+                        curMutiInfo->NwkSKey[0], curMutiInfo->NwkSKey[1], curMutiInfo->NwkSKey[2], curMutiInfo->NwkSKey[3],
+                        \
+                        curMutiInfo->NwkSKey[4], curMutiInfo->NwkSKey[5], curMutiInfo->NwkSKey[6], curMutiInfo->NwkSKey[7],
+                        \
+                        curMutiInfo->NwkSKey[8], curMutiInfo->NwkSKey[9], curMutiInfo->NwkSKey[10],
+                        curMutiInfo->NwkSKey[11], \
+                        curMutiInfo->NwkSKey[12], curMutiInfo->NwkSKey[13], curMutiInfo->NwkSKey[14],
+                        curMutiInfo->NwkSKey[15]);
+            } else {
+		ret = false;
+             }
+        } else if (rxcmd_index > (strlen(LORA_AT_CADDMUTICAST) + 1) &&
+                   rxcmd[strlen(LORA_AT_CADDMUTICAST)] == '=') {
+            MulticastParams_t *curMulticastInfo = aos_malloc(sizeof(MulticastParams_t));
+            char *str = strtok(&rxcmd[strlen(LORA_AT_CADDMUTICAST) + 1], ",");
+            curMulticastInfo->Address = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+            uint8_t len = hex2bin(str, curMulticastInfo->AppSKey, 16);
+            str = strtok(NULL, ",");
+            len = hex2bin(str, curMulticastInfo->NwkSKey, 16);
+            if (len == 16) {
+                set_lora_multicast(curMulticastInfo);
+            } else {
+	        ret = false;
+	    }
+	}
     } else if (strncmp(rxcmd, LORA_AT_CDELMUTICAST, strlen(LORA_AT_CDELMUTICAST)) == 0) {
-        ret = false;
+        if (rxcmd_index == (strlen(LORA_AT_CDELMUTICAST) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CDELMUTICAST)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"%d,DevAddr\"\r\nOK\r\n", LORA_AT_CDELMUTICAST);
+        } else if (rxcmd_index > (strlen(LORA_AT_CDELMUTICAST) + 1) &&
+                   rxcmd[strlen(LORA_AT_CDELMUTICAST)] == '=') {
+            uint32_t devAddr = strtol(&rxcmd[strlen(LORA_AT_CDELMUTICAST) + 1], NULL, 0);
+            ret = lora_del_multicast(devAddr);
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+            } else {
+                ret = false;
+	    }
+	} else {
+	    ret = false;
+	}
     } else if (strncmp(rxcmd, LORA_AT_CNUMMUTICAST, strlen(LORA_AT_CNUMMUTICAST)) == 0) {
-        ret = false;
+	   if (rxcmd_index == (strlen(LORA_AT_CNUMMUTICAST) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CNUMMUTICAST)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"number\"\r\nOK\r\n", LORA_AT_CNUMMUTICAST);
+        } else if (rxcmd_index == (strlen(LORA_AT_CDELMUTICAST) + 1) &&
+                   rxcmd[strlen(LORA_AT_CDELMUTICAST)] == '?') {
+            uint8_t multiNum = get_lora_mulitcast_num();
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d\r\nOK\r\n", LORA_AT_CNUMMUTICAST, multiNum);
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CFREQBANDMASK, strlen(LORA_AT_CFREQBANDMASK)) == 0) {
         if (rxcmd_index == (strlen(LORA_AT_CFREQBANDMASK) + 2) &&
             strcmp(&rxcmd[strlen(LORA_AT_CFREQBANDMASK)], "=?") == 0) {
@@ -344,7 +414,16 @@ void process_linkwan_at(void)
             ret = false;
         }
     } else if (strncmp(rxcmd, LORA_AT_CBL, strlen(LORA_AT_CBL)) == 0) {
-        ret = false;
+        if (rxcmd_index == (strlen(LORA_AT_CBL) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CBL)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"value\"\r\nOK\r\n", LORA_AT_CBL);
+        } else if (rxcmd_index == (strlen(LORA_AT_CBL) + 1) &&
+                   rxcmd[strlen(LORA_AT_CBL)] == '?') {
+            uint8_t batteryLevel = get_device_battery();
+            snprintf(atcmd, ATCMD_SIZE, "%s:%d\r\nOK\r\n", LORA_AT_CBL, status);
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CSTATUS, strlen(LORA_AT_CSTATUS)) == 0) {
         int status;
         if (rxcmd_index == (strlen(LORA_AT_CSTATUS) + 2) &&
@@ -359,9 +438,63 @@ void process_linkwan_at(void)
             ret = false;
         }
     } else if (strncmp(rxcmd, LORA_AT_CJOIN, strlen(LORA_AT_CJOIN)) == 0) {
-        ret = false;
+        uint8_t bJoin, bAutoJoin;
+	uint16_t joinInterval, joinRetryCnt;
+        if (rxcmd_index == (strlen(LORA_AT_CJOIN) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CJOIN)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:<ParaTag1>,[ParaTag2],[ParaTag3],[ParaTag4]\r\n", LORA_AT_CJOIN);
+        } else if (rxcmd_index == (strlen(LORA_AT_CJOIN) + 1) &&
+                   rxcmd[strlen(LORA_AT_CJOIN)] == '?') {
+#if 0
+       	    bJoin = 1;
+	    bAutoJoin = 1;
+	    joinInterval = 1;
+	    joinRetryCnt = 8;
+#endif
+	    snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d,%d,%d,%d\r\nOK\r\n", LORA_AT_CJOIN, bJoin, bAutoJoin, joinInterval, joinRetryCnt);
+        } else if (rxcmd_index >=  (strlen(LORA_AT_CJOIN) + 2) &&
+                   rxcmd[strlen(LORA_AT_CJOIN)] == '=') {
+            char *str = strtok(&rxcmd[strlen(LORA_AT_CJOIN) + 1], ",");
+            bJoin = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+            bAutoJoin = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+            joinInterval = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+            joinRetryCnt = strtol(str, NULL, 0);
+            if(bJoin == 0){//stop join
+
+	    } else if(bJoin ==1){
+                 init_lora_join(bAutoJoin, joinInterval, joinRetryCnt);
+	    }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_DTRX, strlen(LORA_AT_DTRX)) == 0) {
-        ret = false;
+        if (rxcmd_index == (strlen(LORA_AT_DTRX) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_DTRX)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:[confirm],[nbtrials],[length],<payload>\r\n", LORA_AT_DTRX);
+        } else if (rxcmd_index >= (strlen(LORA_AT_DTRX) + 2) &&
+                   rxcmd[strlen(LORA_AT_DTRX)] == '?') {
+	    uint8_t confirm, Nbtrials, len;
+	    uint8_t payload[LORAWAN_APP_DATA_BUFF_SIZE];
+	    char *str = strtok(&rxcmd[strlen(LORA_AT_CJOIN) + 1], ",");
+            confirm = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+            Nbtrials = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+            len = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+	    if(hex2bin(str, payload, 20) == len){
+                ret = lora_tx_data_payload(confirm, Nbtrials, payload, len);
+		if(ret == true){
+                    snprintf(atcmd, ATCMD_SIZE, "\r\nOK+SEND:%d\r\nOK+SENT:", len );
+		}
+	    }
+
+	} else {
+	  ret = false;
+	}
     } else if (strncmp(rxcmd, LORA_AT_DRX, strlen(LORA_AT_DRX)) == 0) {
         if (rxcmd_index == (strlen(LORA_AT_DRX) + 2) &&
             strcmp(&rxcmd[strlen(LORA_AT_DRX)], "=?") == 0) {
@@ -370,7 +503,6 @@ void process_linkwan_at(void)
                    rxcmd[strlen(LORA_AT_DRX)] == '?') {
             lora_AppData_t *rx_data;
             int16_t len = 0;
-
             rx_data = get_lora_rx_data();
             len = snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d", LORA_AT_DRX, rx_data->BuffSize);
             if (rx_data->BuffSize > 0) {
@@ -444,15 +576,135 @@ void process_linkwan_at(void)
             ret = false;
         }
     } else if (strncmp(rxcmd, LORA_AT_CRSSI, strlen(LORA_AT_CRSSI)) == 0) {
-        ret = false;
+	if (rxcmd_index == (strlen(LORA_AT_CRSSI) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CRSSI)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s\r\nOK\r\n", LORA_AT_CRSSI);
+        } else if ((rxcmd_index > strlen(LORA_AT_CRSSI) + 2) &&
+                   (rxcmd[rxcmd_index - 1] == '?')) {
+            if (rxcmd_index - strlen(LORA_AT_CRSSI) - 2 == 0) {
+                ret = false;
+            } else {
+                char freq_str[4];
+                int16_t channel_rssi[8];
+                strncpy(&freq_str, &rxcmd[strlen(LORA_AT_CRSSI)], rxcmd_index - strlen(LORA_AT_CRSSI) - 2);
+                freq_str[rxcmd_index - strlen(LORA_AT_CRSSI) - 2] = '\0';
+                uint8_t freq_band = strtol(freq_str, NULL, 0);
+                get_lora_rssi(freq_band, channel_rssi);
+                snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\r\n0:%d\r\n1:%d\r\n2:%d\r\n3:%d\r\n4:%d\r\n5:%d\r\n6:%d\r\n7:%d\r\nOK\r\n", \
+                         LORA_AT_CRSSI, channel_rssi[0], channel_rssi[1], channel_rssi[2], channel_rssi[3], channel_rssi[4], channel_rssi[5],
+                         channel_rssi[6], channel_rssi[7]);
+                ret = true;
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CNBTRIALS, strlen(LORA_AT_CNBTRIALS)) == 0) {
-        ret = false;
+	int8_t m_type, value;
+        if (rxcmd_index == (strlen(LORA_AT_CNBTRIALS) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CNBTRIALS)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"MTypes\",\"value\"\r\nOK\r\n", LORA_AT_CNBTRIALS);
+        } else if (rxcmd_index == (strlen(LORA_AT_CNBTRIALS) + 1) &&
+                   rxcmd[strlen(LORA_AT_CNBTRIALS)] == '?') {
+            m_type = get_lora_tx_cfm_flag();
+            value = get_lora_tx_cfm_trials();
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d,%d\r\nOK\r\n", LORA_AT_CNBTRIALS, m_type, value);
+        } else if (rxcmd_index >  (strlen(LORA_AT_CNBTRIALS) + 1) &&
+                   rxcmd[strlen(LORA_AT_CNBTRIALS)] == '=') {
+            m_type = rxcmd[strlen(LORA_AT_CNBTRIALS) + 1] - '0';
+            value = strtol(&rxcmd[strlen(LORA_AT_CNBTRIALS) + 2], NULL, 0);
+            if ((m_type == 0 || m_type == 1) && (value >= 1 && value <= 16)) {
+                set_lora_tx_cfm_flag(m_type);
+                set_lora_tx_cfm_trials(value);
+                ret = true;
+            } else {
+                ret = false;
+            }
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+            } else {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nCME ERROR:error%d\r\n", ret);
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CRM, strlen(LORA_AT_CRM)) == 0) {
-        ret = false;
+        int8_t reportMode;
+        uint32_t reportInterval;
+        if (rxcmd_index == (strlen(LORA_AT_CRM) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CRM)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"reportMode\",\"reportInterval\"\r\nOK\r\n", LORA_AT_CRM);
+        } else if (rxcmd_index ==  (strlen(LORA_AT_CRM) + 1) &&
+                   rxcmd[strlen(LORA_AT_CRM)] == '?') {
+            reportMode = get_lora_report_mode();
+            reportInterval = get_lora_tx_dutycycle() / 1000;
+            ret = true;
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d,%d\r\nOK\r\n", LORA_AT_CRM, reportMode, reportInterval);
+            } else {
+                ret = false;
+            }
+        } else if (rxcmd_index >  (strlen(LORA_AT_CRM) + 2) &&
+                   rxcmd[strlen(LORA_AT_CRM)] == '=') {
+            reportMode = rxcmd[strlen(LORA_AT_CRM) + 1] - '0';
+            reportInterval = strtol(&rxcmd[strlen(LORA_AT_CRM) + 2], NULL, 0);
+            if ((reportMode == 0 || reportMode == 1) && (reportInterval >= 1)) {
+                set_lora_report_mode(reportMode);
+                set_lora_tx_dutycycle(reportInterval * 1000);
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK%d%d\r\n", reportMode, reportInterval);
+                ret = true;
+            } else {
+                ret = false;
+                snprintf(atcmd, ATCMD_SIZE, "\r\nCME ERROR:%d\r\n", ret);
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CTXP, strlen(LORA_AT_CTXP)) == 0) {
-        ret = false;
+        const int8_t txpwrtbl[] = {20, 17, 16, 14, 12, 10, 7, 5, 2};
+	uint8_t index;
+        if (rxcmd_index == (strlen(LORA_AT_CTXP) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CTXP)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"value\"\r\nOK\r\n", LORA_AT_CTXP);
+        } else if (rxcmd_index == (strlen(LORA_AT_CTXP) + 1) &&
+                   rxcmd[strlen(LORA_AT_CTXP)] == '?') {
+            int8_t txpwr = get_lora_tx_power();
+            for (index  = 0; index < 9; index++) {
+                if (txpwr == txpwrtbl[index]) {
+                    break;
+                }
+            }
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d\r\n", LORA_AT_CTXP, index);
+        } else if (rxcmd_index == (strlen(LORA_AT_CTXP) + 2) &&
+                   rxcmd[strlen(LORA_AT_CTXP)] == '=') {
+            ret = false;
+            int8_t txpwrIdx = strtol(&rxcmd[strlen(LORA_AT_CTXP) + 1], NULL, 0);
+            ret = set_lora_tx_power(txpwrtbl[txpwrIdx]);
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CLINKCHECK, strlen(LORA_AT_CLINKCHECK)) == 0) {
-        ret = false;
+        uint8_t checkValue;
+        if (rxcmd_index == (strlen(LORA_AT_CLINKCHECK) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CLINKCHECK)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"value\"\r\nOK\r\n", LORA_AT_CLINKCHECK);
+        } else if (rxcmd_index > (strlen(LORA_AT_CLINKCHECK) + 1) &&
+                   rxcmd[strlen(LORA_AT_CLINKCHECK)] == '=') {
+            ret = false;
+            checkValue = strtol(&rxcmd[strlen(LORA_AT_CLINKCHECK) + 1], NULL, 0);
+            if (checkValue == 1) {
+                send_lora_link_check();
+            } else {
+                //TBD:
+            }
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CADR, strlen(LORA_AT_CADR)) == 0) {
         int adr;
         if (rxcmd_index == (strlen(LORA_AT_CADR) + 2) &&
@@ -474,15 +726,83 @@ void process_linkwan_at(void)
             ret = false;
         }
     } else if (strncmp(rxcmd, LORA_AT_CRXP, strlen(LORA_AT_CRXP)) == 0) {
-        ret = false;
+        uint8_t RX1DRoffset;
+        uint8_t RX2DataRate;
+        uint32_t RX2Frequency;
+        LoRaMacParams_t *mMacParams;
+        if (rxcmd_index == (strlen(LORA_AT_CRXP) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CRXP)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"RX1DRoffset\",\"RX2DataRate\",\"RX2Frequency\"\r\nOK\r\n", LORA_AT_CRXP);
+        } else if (rxcmd_index == (strlen(LORA_AT_CRXP) + 1) &&
+                   rxcmd[strlen(LORA_AT_CADR)] == '?') {
+            mMacParams = get_lora_mac_params();
+            RX1DRoffset = mMacParams->Rx1DrOffset;
+            RX2DataRate = mMacParams->Rx2Channel.Datarate;
+            RX2Frequency = mMacParams->Rx2Channel.Frequency;
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d,%d,%d\r\nOK\r\n", LORA_AT_CRXP, RX1DRoffset, RX2DataRate, RX2Frequency);
+        } else if (rxcmd_index > (strlen(LORA_AT_CRXP) + 2) &&
+                   rxcmd[strlen(LORA_AT_CRXP)] == '=') {
+            char *str = strtok(&rxcmd[strlen(LORA_AT_CRXP) + 1], ",");
+            RX1DRoffset = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+            RX2DataRate = strtol(str, NULL, 0);
+            str = strtok(NULL, ",");
+            RX2Frequency = strtol(str, NULL, 0);
+            ret = set_lora_rx_window_params(RX1DRoffset, RX2DataRate, RX2Frequency);
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK-%d,%d,%d\r\n", RX1DRoffset, RX2DataRate, RX2Frequency);
+                linkwan_serial_output(atcmd, strlen(atcmd));
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CFREQLIST, strlen(LORA_AT_CFREQLIST)) == 0) {
         ret = false;
     } else if (strncmp(rxcmd, LORA_AT_CRX1DELAY, strlen(LORA_AT_CRX1DELAY)) == 0) {
-        ret = false;
+	uint32_t rx1delay;
+        LoRaMacParams_t *mMacParams;
+        if (rxcmd_index == (strlen(LORA_AT_CRX1DELAY) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CRX1DELAY)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"value\"\r\n", LORA_AT_CRX1DELAY);
+        } else if (rxcmd_index == (strlen(LORA_AT_CRX1DELAY) + 1) &&
+                   rxcmd[strlen(LORA_AT_CRX1DELAY)] == '?') {
+            mMacParams = get_lora_mac_params();
+            rx1delay = (mMacParams->ReceiveDelay1) / 1000;
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d\r\n", LORA_AT_CRX1DELAY, rx1delay);
+        } else if (rxcmd_index == (strlen(LORA_AT_CRX1DELAY) + 2) &&
+                   rxcmd[strlen(LORA_AT_CRX1DELAY)] == '=') {
+            ret = false;
+            rx1delay = strtol(&rxcmd[strlen(LORA_AT_CRX1DELAY) + 1], NULL, 0);
+            ret = set_lora_mac_rx1_delay(rx1delay);
+            if (ret == true) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CSAVE, strlen(LORA_AT_CSAVE)) == 0) {
-        ret = false;
+        if (rxcmd_index == (strlen(LORA_AT_CSAVE) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CSAVE)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s\r\nOK\r\n", LORA_AT_CSAVE);
+        } else if (rxcmd_index == strlen(LORA_AT_CSAVE)) {
+            LoRaMacParams_t *mMacP;
+            mMacP = get_lora_mac_params();
+            memcpy(&gMacParams, mMacP, sizeof(LoRaMacParams_t));
+            aos_kv_set("gLoRaMacPara", &gMacParams, sizeof(LoRaMacParams_t), 1);
+            snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CSAVE, strlen(LORA_AT_CRESTORE)) == 0) {
-        ret = false;
+        if (rxcmd_index == (strlen(LORA_AT_CRESTORE) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_CRESTORE)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s\r\nOK\r\n", LORA_AT_CSAVE);
+        } else if (rxcmd_index == strlen(LORA_AT_CRESTORE)) {
+            aos_kv_set("gLoRaMacPara", &LoRaMacParamsDefaults, sizeof(LoRaMacParams_t), 1);
+            snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_CSAVE, strlen(LORA_AT_CREPEATERFILTER)) == 0) {
         ret = false;
     } else if (strncmp(rxcmd, LORA_AT_CGMI, strlen(LORA_AT_CGMI)) == 0) {

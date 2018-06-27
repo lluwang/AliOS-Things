@@ -35,15 +35,20 @@ typedef struct lora_config_s {
     uint16_t flag;
 } lora_config_t;
 
+
 typedef struct lora_dev_s {
     uint8_t dev_eui[8];
     uint8_t app_eui[8];
     uint8_t app_key[16];
+    int8_t freqband;
+    int8_t datarate;
     int8_t class;
     uint8_t mode;  // normal or repeater
     uint16_t mask;
     uint16_t flag;
-} lora_dev_t;
+    uint16_t crc;
+} __attribute__((packed)) lora_dev_t;
+
 
 typedef struct lora_abp_id_s {
     uint8_t devaddr[4];
