@@ -1127,14 +1127,29 @@ bool set_lora_report_mode(int8_t mode)
 
 int8_t get_lora_tx_power(void)
 {
-    RadioLoRaSettings_t *m_Lora;
-    //m_Lora = Radio.GetTxConfig();
-    return m_Lora->Power;
+    MibRequestConfirm_t mib_req;
+    LoRaMacStatus_t status;
+
+    mib_req.Type = MIB_CHANNELS_TX_POWER;
+    status = LoRaMacMibGetRequestConfirm(&mib_req);
+    if (status == LORAMAC_STATUS_OK) {
+        return mib_req.Param.ChannelsTxPower;
+    }
+    return status;
 }
 
 bool set_lora_tx_power(int8_t pwr)
-{
-    //return Radio.SetTxPwr(pwr);
+{   
+    MibRequestConfirm_t mib_req;
+    LoRaMacStatus_t status;
+
+    mib_req.Type = MIB_CHANNELS_TX_POWER;
+    mib_req.Param.ChannelsTxPower = pwr;
+    status = LoRaMacMibSetRequestConfirm(&mib_req);
+    if (status == LORAMAC_STATUS_OK) {
+        return true;
+    }
+    return false;
 }
 
 
