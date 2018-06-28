@@ -842,7 +842,23 @@ void process_linkwan_at(void)
     } else if (strncmp(rxcmd, LORA_AT_ILOGLVL, strlen(LORA_AT_ILOGLVL)) == 0) {
         ret = false;
     } else if (strncmp(rxcmd, LORA_AT_IREBOOT, strlen(LORA_AT_IREBOOT)) == 0) {
-        ret = false;
+	if (rxcmd_index == (strlen(LORA_AT_IREBOOT) + 2) &&
+            strcmp(&rxcmd[strlen(LORA_AT_IREBOOT)], "=?") == 0) {
+            snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n", LORA_AT_IREBOOT);
+        } else if (rxcmd_index == (strlen(LORA_AT_IREBOOT) + 2) &&
+                   rxcmd[strlen(LORA_AT_IREBOOT)] == '=') {
+            ret = false;
+            int8_t mode = strtol(&rxcmd[strlen(LORA_AT_IREBOOT) + 1], NULL, 0);
+            if (mode == 0 || mode == 1) {
+                snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
+                lora_reboot(mode);
+                ret = true;
+            } else {
+                ret = false;
+            }
+        } else {
+            ret = false;
+        }
     } else if (strncmp(rxcmd, LORA_AT_IDEFAULT, strlen(LORA_AT_IDEFAULT)) == 0) {
         ret = false;
     } else {
