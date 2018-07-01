@@ -91,12 +91,12 @@ void process_linkwan_at(void)
             snprintf(atcmd, ATCMD_SIZE, "\r\n%s:\"mode\"\r\nOK\r\n", LORA_AT_CJOINMODE);
         } else if (rxcmd_index == (strlen(LORA_AT_CJOINMODE) + 1) &&
                    rxcmd[strlen(LORA_AT_CJOINMODE)] == '?') {
-            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:0\r\nOK\r\n", LORA_AT_CJOINMODE);
+            snprintf(atcmd, ATCMD_SIZE, "\r\n%s:%d\r\nOK\r\n", LORA_AT_CJOINMODE,get_lora_join_mode());
         } else if (rxcmd_index == (strlen(LORA_AT_CJOINMODE) + 2) &&
                    rxcmd[strlen(LORA_AT_CJOINMODE)] == '=') {
             int mode = strtol(&rxcmd[strlen(LORA_AT_CJOINMODE) + 1], NULL, 0);
             if (mode == 0 || mode == 1) {
-                // set join mode
+       	        ret = set_lora_join_mode(mode);
                 snprintf(atcmd, ATCMD_SIZE, "\r\nOK\r\n");
             } else {
                 ret = false;

@@ -13,6 +13,12 @@
 #define LORAWAN_CONFIRMED_MSG ENABLE
 #define JOINREQ_NBTRIALS 3
 
+typedef enum eJoinModeType
+{
+    JOIN_MODE_OTAA,
+    JOIN_MODE_ABP
+} JoinMode_t;
+
 typedef enum node_mode_s {
     NODE_MODE_NORMAL = 0,
     NODE_MODE_REPEATER = 1,  // Alibaba Node Repeater
@@ -99,6 +105,7 @@ typedef struct sLoRaParam {
     int8_t TxDatarate;
     bool EnablePublicNetwork;
     uint8_t NbTrials;
+    JoinMode_t JoinMode;
 } LoRaParam_t;
 
 typedef enum eDevicState {

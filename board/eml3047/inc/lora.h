@@ -88,6 +88,18 @@ typedef struct
   
 } lora_AppData_t;
 
+ /*!
+ *LoRa Join Mode
+ *
+ * */
+
+typedef enum eJoinModeType
+{
+    JOIN_MODE_OTAA,
+    JOIN_MODE_ABP
+} JoinMode_t;
+
+
 /*!
  * LoRa State Machine states 
  */
@@ -155,7 +167,11 @@ typedef struct sLoRaParam
  * @brief Number of trials for the join request.
  */
     uint8_t NbTrials;
-
+/*!
+ * @brief Join mode：0, OTAA; 1,ABP.
+ */
+    JoinMode_t JoinMode;
+ 
 } LoRaParam_t;
 
 /* Lora Main callbacks*/

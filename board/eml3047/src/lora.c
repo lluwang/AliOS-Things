@@ -613,56 +613,56 @@ void lora_Init( LoRaMainCallback_t *callbacks, LoRaParam_t *LoRaParam )
     LoRaMainCallbacks->BoardGetUniqueId( DevEui );
 #endif
 
-#if (OVER_THE_AIR_ACTIVATION != 0)
+    if(LoRaParamInit.JoinMode == JOINT_MODE_OTAA){
 
-    PRINTF_RAW( "OTAA\r\n" );
-    PRINTF_RAW( "DevEui= %02X", DevEui[0] );
-    for ( int i = 1; i < 8; i++ )
-    {
-        PRINTF_RAW( "-%02X", DevEui[i] );
-    };
-    PRINTF_RAW( "\r\n" );
-    PRINTF_RAW( "AppEui= %02X", AppEui[0] );
-    for ( int i = 1; i < 8; i++ )
-    {
-        PRINTF_RAW( "-%02X", AppEui[i] );
-    };
-    PRINTF_RAW( "\r\n" );
-    PRINTF_RAW( "AppKey= %02X", AppKey[0] );
-    for ( int i = 1; i < 16; i++ )
-    {
-        PRINTF_RAW( " %02X", AppKey[i] );
-    };
-    PRINTF_RAW( "\n\r\n" );
-#else
+        PRINTF_RAW( "OTAA\r\n" );
+        PRINTF_RAW( "DevEui= %02X", DevEui[0] );
+        for ( int i = 1; i < 8; i++ )
+        {
+            PRINTF_RAW( "-%02X", DevEui[i] );
+        };
+        PRINTF_RAW( "\r\n" );
+        PRINTF_RAW( "AppEui= %02X", AppEui[0] );
+        for ( int i = 1; i < 8; i++ )
+        {
+            PRINTF_RAW( "-%02X", AppEui[i] );
+        };
+        PRINTF_RAW( "\r\n" );
+        PRINTF_RAW( "AppKey= %02X", AppKey[0] );
+        for ( int i = 1; i < 16; i++ )
+        {
+            PRINTF_RAW( " %02X", AppKey[i] );
+        };
+        PRINTF_RAW( "\n\r\n" );
+} else (LoRaParamInit.JoinMode == JOIN_MODE_ABP){
 
-#if (STATIC_DEVICE_ADDRESS != 1)
-    // Random seed initialization
-    srand1(LoRaMainCallbacks->BoardGetRandomSeed());
-    // Choose a random device address
-    DevAddr = randr(0, 0x01FFFFFF);
-#endif
-    PRINTF_RAW("ABP\r\n");
-    PRINTF_RAW("DevEui= %02X", DevEui[0]);
-    for (int i = 1; i < 8; i++)
-    {
-        PRINTF_RAW("-%02X", DevEui[i]);
-    };
-    PRINTF_RAW("\r\n");
-    PRINTF_RAW("DevAdd=  %08X\n\r", DevAddr);
-    PRINTF_RAW("NwkSKey= %02X", NwkSKey[0]);
-    for (int i = 1; i < 16; i++)
-    {
-        PRINTF_RAW(" %02X", NwkSKey[i]);
-    };
-    PRINTF_RAW("\r\n");
-    PRINTF_RAW("AppSKey= %02X", AppSKey[0]);
-    for (int i = 1; i < 16; i++)
-    {
-        PRINTF_RAW(" %02X", AppSKey[i]);
-    };
-    PRINTF_RAW("\r\n");
-#endif
+    #if (STATIC_DEVICE_ADDRESS != 1)
+        // Random seed initialization
+        srand1(LoRaMainCallbacks->BoardGetRandomSeed());
+        // Choose a random device address
+        DevAddr = randr(0, 0x01FFFFFF);
+    #endif
+        PRINTF_RAW("ABP\r\n");
+        PRINTF_RAW("DevEui= %02X", DevEui[0]);
+        for (int i = 1; i < 8; i++)
+        {
+            PRINTF_RAW("-%02X", DevEui[i]);
+        };
+        PRINTF_RAW("\r\n");
+        PRINTF_RAW("DevAdd=  %08X\n\r", DevAddr);
+        PRINTF_RAW("NwkSKey= %02X", NwkSKey[0]);
+        for (int i = 1; i < 16; i++)
+        {
+            PRINTF_RAW(" %02X", NwkSKey[i]);
+        };
+        PRINTF_RAW("\r\n");
+        PRINTF_RAW("AppSKey= %02X", AppSKey[0]);
+        for (int i = 1; i < 16; i++)
+        {
+            PRINTF_RAW(" %02X", AppSKey[i]);
+        };
+        PRINTF_RAW("\r\n");
+    }
 }
 
 /**

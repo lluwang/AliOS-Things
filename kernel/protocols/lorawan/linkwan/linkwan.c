@@ -42,7 +42,8 @@ static LoRaParam_t lora_param = {
     true,
     DR_0,
     LORAWAN_PUBLIC_NETWORK,
-    JOINREQ_NBTRIALS
+    JOINREQ_NBTRIALS,
+    JOIN_MODE_OTAA
 };
 
 typedef struct {
@@ -446,7 +447,7 @@ void lora_init(LoRaMainCallback_t *callbacks)
 
 static void print_dev_addr(void)
 {
-#if (OVER_THE_AIR_ACTIVATION != 0)
+if(lora_param.JoinMode == JOIN_MODE_OTAA){
     DBG_LINKWAN("OTAA\r\n" );
     DBG_LINKWAN("DevEui= %02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\r\n",
                 g_lora_dev.dev_eui[0], g_lora_dev.dev_eui[1], g_lora_dev.dev_eui[2], g_lora_dev.dev_eui[3], \
@@ -459,7 +460,7 @@ static void print_dev_addr(void)
                 g_lora_dev.app_key[4], g_lora_dev.app_key[5], g_lora_dev.app_key[6], g_lora_dev.app_key[7], \
                 g_lora_dev.app_key[8], g_lora_dev.app_key[9], g_lora_dev.app_key[10], g_lora_dev.app_key[11], \
                 g_lora_dev.app_key[12], g_lora_dev.app_key[13], g_lora_dev.app_key[14], g_lora_dev.app_key[15]);
-#else
+} else if(lora_param.JoinMode == JOIN_MODE_ABP){
     DBG_LINKWAN("ABP\r\n");
     DBG_LINKWAN("DevAddr= %02X-%02X-%02X-%02X\r\n",
                 g_lora_abp_id.devaddr[0], g_lora_abp_id.devaddr[1], g_lora_abp_id.devaddr[2],
@@ -474,8 +475,8 @@ static void print_dev_addr(void)
         PRINTF_RAW(" %02X", g_lora_abp_id.appskey[i]);
     };
     DBG_LINKWAN("\r\n");
-#endif
 
+}
     DBG_LINKWAN("class type %s\r\n", get_class_name(g_lora_dev.class));
     DBG_LINKWAN("freq mode %s\r\n", g_freq_mode == FREQ_MODE_INTER ? "inter" : "intra");
     DBG_LINKWAN("scan chn mask 0x%04x\r\n", g_lora_dev.mask);
@@ -605,54 +606,54 @@ void lora_fsm( void )
             }
 
             case DEVICE_STATE_JOIN: {
-#if (OVER_THE_AIR_ACTIVATION != 0)
-                MlmeReq_t mlmeReq;
-
-                mlmeReq.Type = MLME_JOIN;
-                mlmeReq.Req.Join.DevEui = g_lora_dev.dev_eui;
-                mlmeReq.Req.Join.AppEui = g_lora_dev.app_eui;
-                mlmeReq.Req.Join.AppKey = g_lora_dev.app_key;
-
-                mlmeReq.Req.Join.method = g_join_method;
-                if (g_join_method == STORED_JOIN_METHOD) {
-                    mlmeReq.Req.Join.freqband = g_lora_config.freqband;
-                    mlmeReq.Req.Join.datarate = g_lora_config.datarate;
-                    mlmeReq.Req.Join.NbTrials = 3;
-                } else {
-                    mlmeReq.Req.Join.NbTrials = 2;
-                }
-
-                if (next_tx == true && rejoin_flag == true) {
-                    if (LoRaMacMlmeRequest(&mlmeReq) == LORAMAC_STATUS_OK) {
-                        next_tx = false;
+                if(lora_param.JoinMode == JOIN_MODE_OTAA){
+                    MlmeReq_t mlmeReq;
+    
+                    mlmeReq.Type = MLME_JOIN;
+                    mlmeReq.Req.Join.DevEui = g_lora_dev.dev_eui;
+                    mlmeReq.Req.Join.AppEui = g_lora_dev.app_eui;
+                    mlmeReq.Req.Join.AppKey = g_lora_dev.app_key;
+    
+                    mlmeReq.Req.Join.method = g_join_method;
+                    if (g_join_method == STORED_JOIN_METHOD) {
+                        mlmeReq.Req.Join.freqband = g_lora_config.freqband;
+                        mlmeReq.Req.Join.datarate = g_lora_config.datarate;
+                        mlmeReq.Req.Join.NbTrials = 3;
+                    } else {
+                        mlmeReq.Req.Join.NbTrials = 2;
                     }
-                    DBG_LINKWAN("Start to Join, method %d, nb_trials:%d\r\n",
-                                g_join_method, mlmeReq.Req.Join.NbTrials);
-                }
-                device_state = DEVICE_STATE_SLEEP;
-#else
-                mibReq.Type = MIB_NET_ID;
-                mibReq.Param.NetID = LORAWAN_NETWORK_ID;
-                LoRaMacMibSetRequestConfirm(&mibReq);
-
-                mibReq.Type = MIB_DEV_ADDR;
-                mibReq.Param.DevAddr = g_lora_abp_id.devaddr;
-                LoRaMacMibSetRequestConfirm(&mibReq);
-
-                mibReq.Type = MIB_NWK_SKEY;
-                mibReq.Param.NwkSKey = g_lora_abp_id.nwkskey;
-                LoRaMacMibSetRequestConfirm(&mibReq);
-
-                mibReq.Type = MIB_APP_SKEY;
-                mibReq.Param.AppSKey = g_lora_abp_id.appskey;
-                LoRaMacMibSetRequestConfirm(&mibReq);
-
-                mibReq.Type = MIB_NETWORK_JOINED;
-                mibReq.Param.IsNetworkJoined = true;
-                LoRaMacMibSetRequestConfirm(&mibReq);
-
-                device_state = DEVICE_STATE_SEND;
-#endif
+    
+                    if (next_tx == true && rejoin_flag == true) {
+                        if (LoRaMacMlmeRequest(&mlmeReq) == LORAMAC_STATUS_OK) {
+                            next_tx = false;
+                        }
+                        DBG_LINKWAN("Start to Join, method %d, nb_trials:%d\r\n",
+                                    g_join_method, mlmeReq.Req.Join.NbTrials);
+                    }
+                    device_state = DEVICE_STATE_SLEEP;
+		} else if(lora_param.JoinMode == JOIN_MODE_ABP){
+                    mibReq.Type = MIB_NET_ID;
+                    mibReq.Param.NetID = LORAWAN_NETWORK_ID;
+                    LoRaMacMibSetRequestConfirm(&mibReq);
+    
+                    mibReq.Type = MIB_DEV_ADDR;
+                    mibReq.Param.DevAddr = g_lora_abp_id.devaddr;
+                    LoRaMacMibSetRequestConfirm(&mibReq);
+    
+                    mibReq.Type = MIB_NWK_SKEY;
+                    mibReq.Param.NwkSKey = g_lora_abp_id.nwkskey;
+                    LoRaMacMibSetRequestConfirm(&mibReq);
+    
+                    mibReq.Type = MIB_APP_SKEY;
+                    mibReq.Param.AppSKey = g_lora_abp_id.appskey;
+                    LoRaMacMibSetRequestConfirm(&mibReq);
+    
+                    mibReq.Type = MIB_NETWORK_JOINED;
+                    mibReq.Param.IsNetworkJoined = true;
+                    LoRaMacMibSetRequestConfirm(&mibReq);
+    
+                    device_state = DEVICE_STATE_SEND;
+		}
                 break;
             }
             case DEVICE_STATE_JOINED: {
@@ -1005,6 +1006,17 @@ int get_device_status(void)
     return device_state;
 }
 
+JoinMode_t get_lora_join_mode(void)
+{
+    return lora_param.JoinMode;
+
+}
+
+bool set_lora_join_mode(JoinMode_t mode)
+{
+    lora_param.JoinMode = mode;
+    return true;
+}
 
 LoRaMacParams_t *get_lora_mac_params(void)
 {
