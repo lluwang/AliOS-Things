@@ -31,6 +31,10 @@ static bool next_tx = true;
 static uint8_t num_trials = 8;
 static bool rejoin_flag = true;
 
+static uint8_t gJoinState = 0;
+static uint8_t gAutoJoin = 1;
+static uint16_t gJoinInterval =8;
+
 static uint32_t g_ack_index = 0;
 static uint32_t g_msg_index = 0;
 
@@ -212,6 +216,7 @@ static void reset_join_state(void)
     read_lora_dev(&lora_dev);
     lora_dev.freqband = -1;
     write_lora_dev(&lora_dev);
+    device_state = DEVICE_STATE_JOIN;
 }
 
 static void on_tx_next_packet_timer_event(void)
@@ -620,7 +625,7 @@ void lora_fsm( void )
                         mlmeReq.Req.Join.datarate = g_lora_config.datarate;
                         mlmeReq.Req.Join.NbTrials = 3;
                     } else {
-                        mlmeReq.Req.Join.NbTrials = 2;
+                        mlmeReq.Req.Join.NbTrials = num_trials;
                     }
     
                     if (next_tx == true && rejoin_flag == true) {
@@ -984,7 +989,7 @@ bool set_lora_tx_len(uint16_t len)
 
 uint8_t get_lora_tx_len(void)
 {
-    return tx_size;
+    return tx_data.BuffSize;
 }
 
 bool send_lora_link_check(void)
@@ -1098,7 +1103,6 @@ uint8_t get_lora_app_port(void)
 bool set_lora_device_status(DeviceStatus_t ds)
 {
     device_status = ds;
-    PRINTF_RAW("Set Device Status:%d\r\n", ds);
     return true;
 }
 
@@ -1236,40 +1240,74 @@ uint8_t get_device_battery()
 }
 
 
-static uint16_t joinRetryCnt = 0;
-bool init_lora_join(uint8_t bAutoJoin, uint16_t joinInterval, uint16_t joinRetryCnt)
+
+bool get_lora_join_params(uint8_t *bJoin, uint8_t *bAuto, uint16_t *joinInterval, uint16_t *joinRetryCnt)
 {
-    TimerStop(&TxNextPacketTimer);
-    MibRequestConfirm_t mib_req;
-    mib_req.Type = MIB_NETWORK_JOINED;
-    LoRaMacStatus_t status = LoRaMacMibGetRequestConfirm(&mib_req);
-    if(status == LORAMAC_STATUS_OK){
-        if (mib_req.Param.IsNetworkJoined == true) {
-            device_state = DEVICE_STATE_SEND;
-            return true;//already joined, not need to rejoin
-        } else {
-            rejoin_flag = true;
+    *bJoin = gAutoJoin;
+    *bAuto = gAutoJoin;
+    *joinInterval = gJoinInterval;
+    *joinRetryCnt = get_lora_tx_cfm_trials();
+    return true;
+
+
+}
+
+
+bool init_lora_join(uint8_t bJoin, uint8_t bAutoJoin, uint16_t joinInterval, uint16_t joinRetryCnt)
+{
+
+    bool ret = false;
+    if(bJoin == 0){//stop join
+        TimerStop(&TxNextPacketTimer);
+        MibRequestConfirm_t mib_req;
+        LoRaMacStatus_t status;
+        mib_req.Type = MIB_NETWORK_JOINED;
+        mib_req.Param.IsNetworkJoined = false;
+        status = LoRaMacMibSetRequestConfirm(&mib_req);
+
+        if (status == LORAMAC_STATUS_OK) {
+            device_state = DEVICE_STATE_SLEEP;
+            rejoin_flag = bAutoJoin;
+            ret = true;
+        }
+    } else if(bJoin == 1){
+        set_lora_tx_cfm_trials(joinRetryCnt);
+        rejoin_flag = bAutoJoin;
+        MibRequestConfirm_t mib_req;
+        mib_req.Type = MIB_NETWORK_JOINED;
+        LoRaMacStatus_t status = LoRaMacMibGetRequestConfirm(&mib_req);
+        if (status == LORAMAC_STATUS_OK) {
+            if (mib_req.Param.IsNetworkJoined == true) {
+                mib_req.Type = MIB_NETWORK_JOINED;
+                mib_req.Param.IsNetworkJoined = false;
+                LoRaMacMibSetRequestConfirm(&mib_req);
+            }
+            DBG_LINKWAN("Rejoin again...\r");
+            gJoinInterval = joinInterval;
             reset_join_state();
+            g_join_method = DEF_JOIN_METHOD;
+            TimerStop(&TxNextPacketTimer);
             TimerSetValue(&TxNextPacketTimer, joinInterval);
             TimerStart(&TxNextPacketTimer);
             return true;
+
         }
+    } else{
+        return false;
     }
 }
 
 
-
-bool lora_tx_data_payload(uint8_t confirm, uint8_t Nbtrials,uint8_t * payload, uint8_t len)
+bool lora_tx_data_payload(uint8_t confirm, uint8_t Nbtrials, uint8_t *payload, uint8_t len)
 {
     MibRequestConfirm_t mib_req;
     LoRaMacStatus_t status;
 
-    if (next_tx == false) {
-        return NULL;
-    }
+    TimerStop(&TxNextPacketTimer);
 
     mib_req.Type = MIB_NETWORK_JOINED;
     status = LoRaMacMibGetRequestConfirm(&mib_req);
+
     if (status == LORAMAC_STATUS_OK) {
         if (mib_req.Param.IsNetworkJoined == true) {
             is_tx_confirmed = confirm;
@@ -1278,9 +1316,14 @@ bool lora_tx_data_payload(uint8_t confirm, uint8_t Nbtrials,uint8_t * payload, u
             set_lora_tx_cfm_trials(Nbtrials);
             device_state = DEVICE_STATE_SEND;
             return true;
+
+        } else {
+            rejoin_flag = true;
+            device_state = DEVICE_STATE_JOIN;
+            return false;
         }
     }
     return false;
-
 }
+
 
